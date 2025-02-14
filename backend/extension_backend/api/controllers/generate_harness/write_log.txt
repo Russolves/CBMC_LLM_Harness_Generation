@@ -139,74 +139,64 @@ void insertionSort_harness() {
             "pResponse": [
                 "HTTPResponse_t*",
                 "input variable modeling",
-                "Must not be NULL and its pBuffer must be non-NULL"
+                "pResponse must not be NULL and should have valid buffer fields"
             ],
             "pField": [
                 "const char*",
                 "input variable modeling",
-                "Must not be NULL and its length must be greater than 0"
+                "pField must not be NULL and should have a valid length"
             ],
             "fieldLen": [
                 "size_t",
                 "input variable modeling",
-                "Must be greater than 0 to indicate valid header field length"
+                "fieldLen must be positive and reflect pField length"
             ],
             "pValueLoc": [
                 "const char**",
                 "input variable modeling",
-                "Must not be NULL to store location of found header value"
+                "pValueLoc must not be NULL for valid header value location"
             ],
             "pValueLen": [
                 "size_t*",
                 "input variable modeling",
-                "Must not be NULL to store length of found header value"
+                "pValueLen must not be NULL for valid header value length"
             ]
         },
         "findHeaderInResponse": {
             "pBuffer": [
                 "const uint8_t*",
                 "input variable modeling",
-                "Must not be NULL and its length must match bufferLen"
+                "pBuffer must not be NULL and have a valid length"
             ],
             "bufferLen": [
                 "size_t",
                 "input variable modeling",
-                "Must be greater than 0 to indicate valid buffer length"
+                "bufferLen must be positive to represent pBuffer length"
             ],
             "pField": [
                 "const char*",
                 "input variable modeling",
-                "Must not be NULL and its length must match fieldLen"
+                "pField must not be NULL and should have a valid length"
             ],
             "fieldLen": [
                 "size_t",
                 "input variable modeling",
-                "Must be greater than 0 to indicate valid header field length"
+                "fieldLen must be positive and reflect pField length"
             ],
             "pValueLoc": [
                 "const char**",
-                "input variable modeling",
-                "Must not be NULL to store location of found header value"
+                "stub function modeling",
+                "Assume pValueLoc provides necessary header value location"
             ],
             "pValueLen": [
                 "size_t*",
-                "input variable modeling",
-                "Must not be NULL to store length of found header value"
+                "stub function modeling",
+                "Assume pValueLen provides necessary header value length"
             ],
-            "context.fieldFound": [
-                "uint8_t",
+            "context": [
+                "findHeaderContext_t",
                 "global variable modeling",
-                "Must be set to 1 if header field is found in response"
-            ],
-            "context.valueFound": [
-                "uint8_t",
-                "global variable modeling",
-                "Must be set to 1 if header value is found in response"
-            ],
-            "parserErrno": [
-                "llhttp_errno_t",
-                "global variable modeling",
-                "Should be HPE_USER if header field-value pair is fully found"
+                "Ensure context is correctly initialized for parsing state"
             ]
         }
     }
@@ -214,22 +204,20 @@ void insertionSort_harness() {
 
 ```c
 void HTTPClient_ReadHeader_harness() {
-    HTTPResponse_t response;
-    const uint8_t buffer[100]; // arbitrary buffer size assumption for testing
-    response.pBuffer = buffer;
-    response.bufferLen = nondet_uint();
-    const char *field = "example-header";
+    HTTPResponse_t *pResponse = (HTTPResponse_t *)nondet_uint();
+    const char *pField = (const char *)nondet_uint();
     size_t fieldLen = nondet_uint();
-    const char *valueLoc;
-    size_t valueLen;
+    const char **pValueLoc = (const char **)nondet_uint();
+    size_t *pValueLen = (size_t *)nondet_uint();
 
-    __CPROVER_assume(response.bufferLen > 0);
-    __CPROVER_assume(field != NULL);
+    __CPROVER_assume(pResponse != NULL);
+    __CPROVER_assume(pResponse->pBuffer != NULL);
+    __CPROVER_assume(pResponse->bufferLen > 0);
+    __CPROVER_assume(pField != NULL);
     __CPROVER_assume(fieldLen > 0);
-    __CPROVER_assume(fieldLen <= 15);  // arbitrary limit for field length
-    __CPROVER_assume(&valueLoc != NULL);
-    __CPROVER_assume(&valueLen != NULL);
+    __CPROVER_assume(pValueLoc != NULL);
+    __CPROVER_assume(pValueLen != NULL);
 
-    HTTPClient_ReadHeader(&response, field, fieldLen, &valueLoc, &valueLen);
+    HTTPClient_ReadHeader(pResponse, pField, fieldLen, pValueLoc, pValueLen);
 }
 ```

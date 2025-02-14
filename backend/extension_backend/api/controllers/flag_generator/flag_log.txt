@@ -1489,9 +1489,9 @@ void insertionSort(int arr[], int size) {
 
 ```json
 {
-  "--bounds-check": "enabled",
   "--pointer-check": "enabled",
-  "--memory-leak-check": "enabled",
-  "--trace": "enabled"
+  "--bounds-check": "enabled",
+  "--trace": "enabled",
+  "--unwind": "5"
 }
 ```
