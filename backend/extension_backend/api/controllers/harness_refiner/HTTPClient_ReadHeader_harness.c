@@ -1,17 +1,22 @@
 void HTTPClient_ReadHeader_harness() {
-    HTTPResponse_t *pResponse = (HTTPResponse_t *)nondet_uint();
-    const char *pField = (const char *)nondet_uint();
-    size_t fieldLen = nondet_uint();
-    const char **pValueLoc = (const char **)nondet_uint();
-    size_t *pValueLen = (size_t *)nondet_uint();
+    HTTPResponse_t response;
+    const char *pField;
+    const char **pValueLoc;
+    size_t *pValueLen;
 
-    __CPROVER_assume(pResponse != NULL);
-    __CPROVER_assume(pResponse->pBuffer != NULL);
-    __CPROVER_assume(pResponse->bufferLen > 0);
+    // Nondeterministic values
+    response.pBuffer = (const uint8_t *)nondet_uint();  // Simulating pointer
+    response.bufferLen = nondet_uint();
+    pField = (const char *)nondet_uint();               // Simulating pointer
+    pValueLoc = (const char **)nondet_uint();           // Simulating pointer
+    pValueLen = (size_t *)nondet_uint();                // Simulating pointer
+
+    // Assumptions based on codeAnalysis
+    __CPROVER_assume(response.pBuffer != NULL);
+    __CPROVER_assume(response.bufferLen > 0);
     __CPROVER_assume(pField != NULL);
-    __CPROVER_assume(fieldLen > 0);
     __CPROVER_assume(pValueLoc != NULL);
     __CPROVER_assume(pValueLen != NULL);
 
-    HTTPClient_ReadHeader(pResponse, pField, fieldLen, pValueLoc, pValueLen);
+    HTTPClient_ReadHeader(&response, pField, response.bufferLen, pValueLoc, pValueLen);
 }

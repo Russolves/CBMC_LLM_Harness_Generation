@@ -74,7 +74,7 @@ void insertionSort_harness() {
 
 
 {
-    "entryPoint": "HTTPClient_ReadHeader",
+    "entryPoint": "findHeaderInResponse",
     "callMatrix": {
         "httpParserOnHeaderFieldCallback": {
             "processCompleteHeader": 1
@@ -131,93 +131,65 @@ void insertionSort_harness() {
         }
     },
     "functionCode": {
-        "HTTPClient_ReadHeader": "HTTPStatus_t HTTPClient_ReadHeader(const HTTPResponse_t *pResponse,\n                                   const char *pField,\n                                   size_t fieldLen,\n                                   const char **pValueLoc,\n                                   size_t *pValueLen)\n{\n    HTTPStatus_t returnStatus = HTTPSuccess;\n\n    if (pResponse == NULL)\n    {\n        LogError((\"Parameter check failed: pResponse is NULL.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else if (pResponse->pBuffer == NULL)\n    {\n        LogError((\"Parameter check failed: pResponse->pBuffer is NULL.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else if (pResponse->bufferLen == 0U)\n    {\n        LogError((\"Parameter check failed: pResponse->bufferLen is 0: \"\n                  \"Buffer len should be > 0.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else if (pField == NULL)\n    {\n        LogError((\"Parameter check failed: Input header name is NULL.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else if (fieldLen == 0U)\n    {\n        LogError((\"Parameter check failed: Input header name length is 0: \"\n                  \"fieldLen should be > 0.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else if (pValueLoc == NULL)\n    {\n        LogError((\"Parameter check failed: Output parameter for header value location is NULL.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else if (pValueLen == NULL)\n    {\n        LogError((\"Parameter check failed: Output parameter for header value length is NULL.\"));\n        returnStatus = HTTPInvalidParameter;\n    }\n    else\n    {\n        /* Empty else for MISRA 15.7 compliance. */\n    }\n\n    if (returnStatus == HTTPSuccess)\n    {\n        returnStatus = findHeaderInResponse(pResponse->pBuffer,\n                                            pResponse->bufferLen,\n                                            pField,\n                                            fieldLen,\n                                            pValueLoc,\n                                            pValueLen);\n    }\n\n    return returnStatus;\n}",
         "findHeaderInResponse": "static HTTPStatus_t findHeaderInResponse(const uint8_t *pBuffer,\n                                         size_t bufferLen,\n                                         const char *pField,\n                                         size_t fieldLen,\n                                         const char **pValueLoc,\n                                         size_t *pValueLen)\n{\n    HTTPStatus_t returnStatus = HTTPSuccess;\n    llhttp_t parser = {0};\n    llhttp_settings_t parserSettings = {0};\n    llhttp_errno_t parserErrno;\n    findHeaderContext_t context = {0};\n\n    context.pField = pField;\n    context.fieldLen = fieldLen;\n    context.pValueLoc = pValueLoc;\n    context.pValueLen = pValueLen;\n    context.fieldFound = 0U;\n    context.valueFound = 0U;\n\n    /* The intention here to define callbacks just for searching the headers. We will\n     * need to create a private context in llhttp->data that has the field and\n     * value to update and pass back. */\n    llhttp_settings_init(&parserSettings);\n    parserSettings.on_header_field = findHeaderFieldParserCallback;\n    parserSettings.on_header_value = findHeaderValueParserCallback;\n    parserSettings.on_headers_complete = findHeaderOnHeaderCompleteCallback;\n    llhttp_init(&parser, HTTP_RESPONSE, &parserSettings);\n\n    /* Set the context for the parser. */\n    parser.data = &context;\n\n    /* Search for the desired header. */\n    parserErrno = llhttp_execute(&parser, (const char *)pBuffer, bufferLen);\n\n    if (context.fieldFound == 0U)\n    {\n        /* If header field is not found, then both the flags should be zero. */\n        assert(context.valueFound == 0U);\n\n        /* Header is not present in buffer. */\n        LogWarn((\"Header not found in response buffer: RequestedHeader=%.*s\",\n                 (int)fieldLen,\n                 pField));\n\n        returnStatus = HTTPHeaderNotFound;\n    }\n    else if (context.valueFound == 0U)\n    {\n        /* The response buffer is invalid as only the header field was found\n         * in the \"<field>: <value>\\r\\n\" format of an HTTP header. */\n        LogError((\"Unable to find header value in response: \"\n                  \"Response data is invalid: \"\n                  \"RequestedHeader=%.*s, ParserError=%s %s\",\n                  (int)fieldLen,\n                  pField,\n                  llhttp_errno_name(parserErrno),\n                  llhttp_get_error_reason(&parser)));\n        returnStatus = HTTPInvalidResponse;\n    }\n    else\n    {\n        /* Header is found. */\n        assert((context.fieldFound == 1U) && (context.valueFound == 1U));\n\n        LogDebug((\"Found requested header in response: \"\n                  \"HeaderName=%.*s, HeaderValue=%.*s\",\n                  (int)fieldLen,\n                  pField,\n                  (int)(*pValueLen),\n                  *pValueLoc));\n        returnStatus = HTTPSuccess;\n    }\n\n    /* If the header field-value pair is found in response, then the return\n     * value of the on_header_value callback should set the llhttp.error to\n     * HPE_USER. */\n    if ((returnStatus == HTTPSuccess) &&\n        (parserErrno != HPE_USER))\n    {\n        LogError((\"Header found in response but llhttp returned error: \"\n                  \"ParserError=%s %s\",\n                  llhttp_errno_name(parserErrno),\n                  llhttp_get_error_reason(&parser)));\n        returnStatus = HTTPParserInternalError;\n    }\n\n    /* If header was not found, then the \"on_header_complete\" callback is\n     * expected to be called which should set the llhttp.error to HPE_OK. */\n    else if ((returnStatus == HTTPHeaderNotFound) &&\n             (parserErrno != HPE_OK))\n    {\n        LogError((\"Header not found in response: llhttp returned error: \"\n                  \"ParserError=%s %s\",\n                  llhttp_errno_name(parserErrno),\n                  llhttp_get_error_reason(&parser)));\n        returnStatus = HTTPInvalidResponse;\n    }\n    else\n    {\n        /* Empty else for MISRA 15.7 compliance. */\n    }\n\n    return returnStatus;\n}"
     },
     "codeAnalysis": {
-        "HTTPClient_ReadHeader": {
-            "pResponse": [
-                "HTTPResponse_t*",
-                "input variable modeling",
-                "pResponse must not be NULL and should have valid buffer fields"
-            ],
-            "pField": [
-                "const char*",
-                "input variable modeling",
-                "pField must not be NULL and should have a valid length"
-            ],
-            "fieldLen": [
-                "size_t",
-                "input variable modeling",
-                "fieldLen must be positive and reflect pField length"
-            ],
-            "pValueLoc": [
-                "const char**",
-                "input variable modeling",
-                "pValueLoc must not be NULL for valid header value location"
-            ],
-            "pValueLen": [
-                "size_t*",
-                "input variable modeling",
-                "pValueLen must not be NULL for valid header value length"
-            ]
-        },
         "findHeaderInResponse": {
             "pBuffer": [
                 "const uint8_t*",
                 "input variable modeling",
-                "pBuffer must not be NULL and have a valid length"
+                "Buffer must be valid, initialized, and of sufficient length"
             ],
             "bufferLen": [
                 "size_t",
                 "input variable modeling",
-                "bufferLen must be positive to represent pBuffer length"
+                "Must represent the number of bytes in pBuffer"
             ],
             "pField": [
                 "const char*",
                 "input variable modeling",
-                "pField must not be NULL and should have a valid length"
+                "Field must be a valid, null-terminated string"
             ],
             "fieldLen": [
                 "size_t",
                 "input variable modeling",
-                "fieldLen must be positive and reflect pField length"
+                "Must match the length of pField string"
             ],
             "pValueLoc": [
                 "const char**",
-                "stub function modeling",
-                "Assume pValueLoc provides necessary header value location"
+                "input variable modeling",
+                "Pointer must be valid, can store return header value location"
             ],
             "pValueLen": [
                 "size_t*",
-                "stub function modeling",
-                "Assume pValueLen provides necessary header value length"
+                "input variable modeling",
+                "Pointer must be valid, can store return header value length"
             ],
             "context": [
                 "findHeaderContext_t",
                 "global variable modeling",
-                "Ensure context is correctly initialized for parsing state"
+                "Used for storing temporary header search information"
             ]
         }
     }
 }
 
 ```c
-void HTTPClient_ReadHeader_harness() {
-    HTTPResponse_t *pResponse = (HTTPResponse_t *)nondet_uint();
-    const char *pField = (const char *)nondet_uint();
+void findHeaderInResponse_harness() {
+    const uint8_t *pBuffer;
+    size_t bufferLen = nondet_uint();
+    const char *pField;
     size_t fieldLen = nondet_uint();
-    const char **pValueLoc = (const char **)nondet_uint();
-    size_t *pValueLen = (size_t *)nondet_uint();
+    const char **pValueLoc;
+    size_t *pValueLen;
 
-    __CPROVER_assume(pResponse != NULL);
-    __CPROVER_assume(pResponse->pBuffer != NULL);
-    __CPROVER_assume(pResponse->bufferLen > 0);
+    __CPROVER_assume(bufferLen > 0);
+    __CPROVER_assume(pBuffer != NULL);
     __CPROVER_assume(pField != NULL);
     __CPROVER_assume(fieldLen > 0);
     __CPROVER_assume(pValueLoc != NULL);
     __CPROVER_assume(pValueLen != NULL);
 
-    HTTPClient_ReadHeader(pResponse, pField, fieldLen, pValueLoc, pValueLen);
+    findHeaderInResponse(pBuffer, bufferLen, pField, fieldLen, pValueLoc, pValueLen);
 }
 ```

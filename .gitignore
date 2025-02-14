@@ -1,4 +1,5 @@
-/harness/node_modules/
+/frontend/harness/node_modules/
+/cbmc/
 /backend/venv/
 /backend/.env
 /backend/extension_backend/api/controllers/code_analysis/analysis_log.txt
